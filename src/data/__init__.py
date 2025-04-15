@@ -1,1 +1,1 @@
-from coco_dataset import COCODataset
+from src.data.coco_dataset import COCODataset

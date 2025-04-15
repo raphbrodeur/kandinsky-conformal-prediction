@@ -1,1 +1,1 @@
-from unet_paper import UNetPaper
+from src.models.unet_paper import UNetPaper

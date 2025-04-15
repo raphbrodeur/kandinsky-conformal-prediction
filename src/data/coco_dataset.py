@@ -35,9 +35,20 @@ class COCODataset(Dataset):
     This class is a Torch Dataset for MS-COCO data used for the segmentation experiments in the paper.
     """
 
-    def __init__(self):
+    def __init__(
+            self,
+            path_to_dir: str,
+            size: tuple[int, int]
+    ):
         """
         Creates the dataset.
+
+        Parameters
+        ----------
+        path_to_dir : str
+            The path to the directory containing the data and labels.
+        size : tuple[int, int]
+            The size of the images to crop to in the format (height, width).
         """
         super().__init__()
 
