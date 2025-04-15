@@ -7,7 +7,7 @@
 
     @Description:       This file contains the basic 2D UNet model used for experiments in the paper "Kandinsky
                         Conformal Prediction: Efficient Calibration of Image Segmentation Algorithms" by Joren
-                        Brunekreef. TODO
+                        Brunekreef.
 """
 
 from torch import cat, Tensor
@@ -84,7 +84,7 @@ class DoubleConvBlock(Sequential):
 
 class UNetPaper(Module):
     """
-    This class is a 2D UNet with TODO
+    This class is a 2D UNet.
     """
 
     def __init__(
