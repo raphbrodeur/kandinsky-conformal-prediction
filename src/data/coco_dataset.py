@@ -17,7 +17,11 @@ from pycocotools.coco import COCO
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from torchvision.transforms.functional import InterpolationMode, pad, resize
+from torchvision.transforms.functional import (
+    InterpolationMode,
+    pad,
+    resize
+)
 
 from src.data.utils import DataExample
 
@@ -94,7 +98,7 @@ class COCODataset(Dataset):
         image = torch.tensor(np.asarray(image_pil).transpose(2, 0, 1), dtype=torch.float32)    # Image tensor (3, H, W)
         seg = torch.tensor(seg_mask.transpose(2, 0, 1), dtype=torch.float32)    # Segmentation tensor (1, H, W)
 
-        # Resize and pad
+        # Adjust resize dims (some images are vertical, others are horizontal)
         aspect_ratio = w / h
         if w > h:
             w = self._size[0]
