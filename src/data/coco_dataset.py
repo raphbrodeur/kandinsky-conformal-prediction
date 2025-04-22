@@ -10,29 +10,16 @@
 """
 
 from pathlib import Path
-from typing import NamedTuple, Tuple
+from typing import Tuple
 
 from PIL import Image
 from pycocotools.coco import COCO
 import numpy as np
-from torch import Tensor, tensor
+from torch import tensor
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import InterpolationMode, pad, resize
 
-
-class DataExample(NamedTuple):
-    """
-    Stores an example's image and segmentation.
-
-    Elements
-    --------
-    x : Tensor
-        The example's image.
-    y : Tensor
-        The example's target segmentation.
-    """
-    x: Tensor
-    y: Tensor
+from src.data.utils import DataExample
 
 
 class COCODataset(Dataset):
