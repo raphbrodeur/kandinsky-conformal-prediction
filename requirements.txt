@@ -1,3 +1,5 @@
+monai
+nibabel
 pillow
 pycocotools
 torch~=2.6.0+cu118
