@@ -9,10 +9,15 @@
                         from MS-COCO.
 """
 
-from typing import NamedTuple
+from pathlib import Path
+from typing import NamedTuple, Tuple
 
-from torch import Tensor
+from PIL import Image
+from pycocotools.coco import COCO
+import numpy as np
+from torch import Tensor, tensor
 from torch.utils.data import Dataset
+from torchvision.transforms.functional import InterpolationMode, pad, resize
 
 
 class DataExample(NamedTuple):
@@ -38,7 +43,7 @@ class COCODataset(Dataset):
     def __init__(
             self,
             path_to_dir: str,
-            size: tuple[int, int]
+            size: Tuple[int, int]
     ):
         """
         Creates the dataset.
@@ -52,7 +57,10 @@ class COCODataset(Dataset):
         """
         super().__init__()
 
-        pass
+        self._path_to_dir = Path(path_to_dir)
+        self._size = size
+
+        self._coco_labels = COCO(self._path_to_dir / "labels.json")
 
     def __len__(self) -> int:
         """
@@ -63,7 +71,7 @@ class COCODataset(Dataset):
         length : int
             The length of the dataset.
         """
-        pass
+        return len(self._coco_labels.imgs)
 
     def __getitem__(self, index: int) -> DataExample:
         """
@@ -79,4 +87,52 @@ class COCODataset(Dataset):
         item : DataExample
             A pair of the item's image and target segmentation.
         """
-        pass
+        # Get image
+        image_pil = Image.open(
+            self._path_to_dir / "data" / self._coco_labels.loadImgs(index)[0]["file_name"]
+        ).convert("RGB")
+
+        # Get segmentation
+        annotations_id = self._coco_labels.getAnnIds(imgIds=index, catIds=[50], iscrowd=None)   # 50 => "persons"
+        annotations = self._coco_labels.loadAnns(annotations_id)
+
+        w, h = image_pil.size           # Image's size
+        seg_mask = np.zeros((h, w, 1))  # Segmentation mask with same size as image
+        for ann in annotations:
+            binary_mask = np.asarray(self._coco_labels.annToMask(ann))
+
+            seg_mask[:, :, 0] = np.logical_or(seg_mask[:, :, 0], binary_mask)
+
+        # Convert to tensor
+        image = tensor(np.asarray(image_pil).transpose(2, 0, 1))    # Create image tensor (3, H, W)
+        seg = tensor(seg_mask.transpose(2, 0, 1))                   # Create segmentation tensor (1, H, W)
+
+        # Resize and pad
+        aspect_ratio = w / h
+        if w > h:
+            w = self._size[0]
+            h = int(w / aspect_ratio)
+        else:
+            h = self._size[1]
+            w = int(h * aspect_ratio)
+
+        # Resize
+        image = resize(img=image, size=(h, w), interpolation=InterpolationMode.BILINEAR)
+        seg = resize(img=seg, size=(h, w), interpolation=InterpolationMode.NEAREST)
+
+        # Pad
+        pad_w = self._size[0] - w
+        pad_h = self._size[1] - h
+
+        pad_left = pad_w // 2
+        pad_right = pad_w - pad_left
+        pad_top = pad_h // 2
+        pad_bottom = pad_h - pad_top
+
+        image = pad(img=image, padding=[pad_left, pad_top, pad_right, pad_bottom], fill=0)
+        seg = pad(img=seg, padding=[pad_left, pad_top, pad_right, pad_bottom], fill=0)
+
+        # Transforms
+        ...
+
+        return DataExample(x=image, y=seg)
