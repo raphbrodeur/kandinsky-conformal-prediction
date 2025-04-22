@@ -15,7 +15,7 @@ from typing import Tuple
 from PIL import Image
 from pycocotools.coco import COCO
 import numpy as np
-from torch import tensor
+import torch
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import InterpolationMode, pad, resize
 
@@ -91,8 +91,8 @@ class COCODataset(Dataset):
             seg_mask[:, :, 0] = np.logical_or(seg_mask[:, :, 0], binary_mask)
 
         # Convert to tensor
-        image = tensor(np.asarray(image_pil).transpose(2, 0, 1))    # Create image tensor (3, H, W)
-        seg = tensor(seg_mask.transpose(2, 0, 1))                   # Create segmentation tensor (1, H, W)
+        image = torch.tensor(np.asarray(image_pil).transpose(2, 0, 1), dtype=torch.float32)    # Image tensor (3, H, W)
+        seg = torch.tensor(seg_mask.transpose(2, 0, 1), dtype=torch.float32)    # Segmentation tensor (1, H, W)
 
         # Resize and pad
         aspect_ratio = w / h
