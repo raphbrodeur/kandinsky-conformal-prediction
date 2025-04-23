@@ -12,6 +12,11 @@
 from pathlib import Path
 from typing import Tuple
 
+from monai.transforms import (
+    Compose,
+    RandAffined,
+    RandFlipd
+)
 from PIL import Image
 from pycocotools.coco import COCO
 import numpy as np
@@ -34,7 +39,8 @@ class COCODataset(Dataset):
     def __init__(
             self,
             path_to_dir: str,
-            size: Tuple[int, int]
+            size: Tuple[int, int],
+            apply_augmentations: bool
     ):
         """
         Creates the dataset.
@@ -45,13 +51,32 @@ class COCODataset(Dataset):
             The path to the directory containing the data and labels.
         size : tuple[int, int]
             The size of the images to crop to in the format (height, width).
+        apply_augmentations : bool
+            Whether to apply augmentations (random horizontal flip and random affine transformation) to the data.
         """
         super().__init__()
 
         self._path_to_dir = Path(path_to_dir)
         self._size = size
+        self._apply_augmentations = apply_augmentations
 
         self._coco_labels = COCO(self._path_to_dir / "labels.json")
+        self._transforms = Compose([
+            RandFlipd(
+                keys=["img", "seg"],
+                prob=0.5,
+                spatial_axis=1                  # Horizontal flip
+            ),
+            RandAffined(
+                keys=["img", "seg"],
+                prob=1.0,                       # Always sample an affine transformation
+                rotate_range=5 * np.pi / 180,   # Sample rotation from U(-5, 5) degrees
+                translate_range=[0.1, 0.1],     # Sample translation from U(-0.1, 0.1) in both dims (x,y)
+                scale_range=[0.2, 0.2],         # Sample scaling factor from U(0.8, 1.2) in both dims
+                mode="nearest",                 # Like for torchvision's RandAffine
+                padding_mode="zeros"            # Like for torchvision's RandAffine
+            )
+        ])
 
     def __len__(self) -> int:
         """
@@ -123,7 +148,11 @@ class COCODataset(Dataset):
         image = pad(img=image, padding=[pad_left, pad_top, pad_right, pad_bottom], fill=0)
         seg = pad(img=seg, padding=[pad_left, pad_top, pad_right, pad_bottom], fill=0)
 
-        # Transforms
-        ...
+        # Augmentation (apply random horizontal flip and random affine)
+        if self._apply_augmentations:
+            augmented_dict = self._transforms({"img": image, "seg": seg})
+
+            image = augmented_dict["img"]
+            seg = augmented_dict["seg"]
 
         return DataExample(x=image, y=seg)

@@ -12,6 +12,11 @@
 from typing import List, Tuple
 
 from monai.apps.datasets import DecathlonDataset as MONAIDecathlonDataset
+from monai.transforms import (
+    Compose,
+    RandAffined,
+    RandFlipd
+)
 import numpy as np
 import torch
 from torch.utils.data import (
@@ -19,6 +24,7 @@ from torch.utils.data import (
     Dataset,
     Subset
 )
+from torchvision.transforms import RandomAffine, RandomHorizontalFlip
 from torchvision.transforms.functional import InterpolationMode, resize
 
 from src.data.utils import DataExample
@@ -106,7 +112,8 @@ class SlicedDecathlonDataset(Dataset):
     def __init__(
             self,
             dataset: Subset,
-            size: Tuple[int, int]
+            size: Tuple[int, int],
+            apply_augmentations: bool
     ):
         """
         Creates the dataset from a ....
@@ -117,13 +124,32 @@ class SlicedDecathlonDataset(Dataset):
             The Dataset containing the unsliced patients.
         size : tuple[int, int]
             The size of the slices to crop to in the format (height, width).
+        apply_augmentations : bool
+            Whether to apply augmentations (random horizontal flip and random affine transformation) to the data.
         """
         super().__init__()
 
         self._dataset = dataset
         self._size = size
+        self._apply_augmentations = apply_augmentations
 
         self._slice_indices_mapping = self._get_slice_indices_mapping()
+        self._transforms = Compose([
+            RandFlipd(
+                keys=["img", "seg"],
+                prob=0.5,
+                spatial_axis=1                  # Horizontal flip
+            ),
+            RandAffined(
+                keys=["img", "seg"],
+                prob=1.0,                       # Always sample an affine transformation
+                rotate_range=5 * np.pi / 180,   # Sample rotation from U(-5, 5) degrees
+                translate_range=[0.1, 0.1],     # Sample translation from U(-0.1, 0.1) in both dims (x,y)
+                scale_range=[0.2, 0.2],         # Sample scaling factor from U(0.8, 1.2) in both dims
+                mode="nearest",                 # Like for torchvision's RandAffine
+                padding_mode="zeros"            # Like for torchvision's RandAffine
+            )
+        ])
 
     def _get_slice_indices_mapping(self) -> List[Tuple[int, int]]:
         """
@@ -181,7 +207,11 @@ class SlicedDecathlonDataset(Dataset):
         image = resize(img=image, size=self._size, interpolation=InterpolationMode.BILINEAR)
         seg = resize(img=seg, size=self._size, interpolation=InterpolationMode.NEAREST)
 
-        # Transforms
-        ...
+        # Augmentation (apply random horizontal flip and random affine)
+        if self._apply_augmentations:
+            augmented_dict = self._transforms({"img": image, "seg": seg})
+
+            image = augmented_dict["img"]
+            seg = augmented_dict["seg"]
 
         return DataExample(x=image, y=seg)
