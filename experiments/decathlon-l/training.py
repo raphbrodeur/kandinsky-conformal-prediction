@@ -98,7 +98,6 @@ if __name__ == "__main__":
             opt.step()
 
             loss_per_batch.append(loss.item())
-            print(loss.item())
 
         loss_per_epoch.append(np.mean(loss_per_batch))
 
