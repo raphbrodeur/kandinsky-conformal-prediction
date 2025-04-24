@@ -15,7 +15,8 @@ from typing import Tuple
 from monai.transforms import (
     Compose,
     RandAffined,
-    RandFlipd
+    RandFlipd,
+    ToTensord
 )
 from PIL import Image
 from pycocotools.coco import COCO
@@ -75,7 +76,8 @@ class COCODataset(Dataset):
                 scale_range=[0.2, 0.2],         # Sample scaling factor from U(0.8, 1.2) in both dims
                 mode="nearest",                 # Like for torchvision's RandAffine
                 padding_mode="zeros"            # Like for torchvision's RandAffine
-            )
+            ),
+            ToTensord(keys=["img", "seg"], track_meta=False),
         ])
 
     def __len__(self) -> int:
