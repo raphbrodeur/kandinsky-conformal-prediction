@@ -6,7 +6,8 @@
     @Last modification: 04/2025
 
     @Description:       This file contains the class COCODataset which is the Dataset from the paper used to load data
-                        from MS-COCO.
+                        from MS-COCO. Warning ! See __getitem__ method. Temporary workarounds are used because of
+                        time constraints. They should be removed for an actual implementation.
 """
 
 from pathlib import Path
@@ -105,6 +106,10 @@ class COCODataset(Dataset):
         item : DataExample
             A pair of the item's image and target segmentation.
         """
+        # TODO workaround because COCO dataset starts at 1. Warning: might "contaminate" train/calib/test datasets
+        if index == 0:
+            index += 1
+
         # Get image
         image_pil = Image.open(
             self._path_to_dir / "data" / self._coco_labels.loadImgs(index)[0]["file_name"]
@@ -117,6 +122,12 @@ class COCODataset(Dataset):
         w, h = image_pil.size           # Image's size
         seg_mask = np.zeros((h, w, 1))  # Segmentation mask with same size as image
         for ann in annotations:
+
+            # TODO workaround to skip empty annotations. Warning: might reduce a dataset's actual size
+            if len(ann["segmentation"]) == 0:
+                print("Skipping item, no segmentation found.")
+                continue
+
             binary_mask = np.asarray(self._coco_labels.annToMask(ann))
 
             seg_mask[:, :, 0] = np.logical_or(seg_mask[:, :, 0], binary_mask)

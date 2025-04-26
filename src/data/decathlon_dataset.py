@@ -14,8 +14,11 @@ from typing import List, Tuple
 from monai.apps.datasets import DecathlonDataset as MONAIDecathlonDataset
 from monai.transforms import (
     Compose,
+    LoadImaged,
     RandAffined,
-    RandFlipd
+    RandFlipd,
+    ScaleIntensityd,
+    ToTensord
 )
 import numpy as np
 import torch
@@ -24,7 +27,6 @@ from torch.utils.data import (
     Dataset,
     Subset
 )
-from torchvision.transforms import RandomAffine, RandomHorizontalFlip
 from torchvision.transforms.functional import InterpolationMode, resize
 
 from src.data.utils import DataExample
@@ -41,7 +43,7 @@ class DecathlonDataset(Dataset):
             path_to_dir: str
     ):
         """
-        Creates the dataset.
+        Creates the dataset. Wraps MONAI's DecathlonDataset for simplicity.
 
         Parameters
         ----------
@@ -50,9 +52,26 @@ class DecathlonDataset(Dataset):
         """
         super().__init__()
 
-        # Wrap MONAI's DecathlonDataset for simplicity
-        train_ds = MONAIDecathlonDataset(root_dir=path_to_dir, task="Task07_Pancreas", section="training")
-        val_ds = MONAIDecathlonDataset(root_dir=path_to_dir, task="Task07_Pancreas", section="validation")
+        # Define transformations
+        transforms = Compose([
+            LoadImaged(keys=["image", "label"]),
+            ScaleIntensityd(keys=["image"]),
+            ToTensord(keys=["image", "label"], track_meta=False),   # Otherwise MONAI transforms return monai.MetaTensor
+        ])
+
+        # MONAI's DecathlonDataset handles loading the data from the directory
+        train_ds = MONAIDecathlonDataset(
+            root_dir=path_to_dir,
+            task="Task07_Pancreas",
+            section="training",
+            transform=transforms
+        )
+        val_ds = MONAIDecathlonDataset(
+            root_dir=path_to_dir,
+            task="Task07_Pancreas",
+            section="validation",
+            transform=transforms
+        )
 
         self._dataset = ConcatDataset([train_ds, val_ds])   # Concatenate training data and validation data
 
@@ -82,23 +101,21 @@ class DecathlonDataset(Dataset):
             A pair of the patient's image and target segmentation in dimensions (z, x, y), only slices containing
             annotations.
         """
-        # Convert from MetaTensor to ndarray of size (x, y, z)
-        image = self._dataset[index]["image"].numpy()
-        seg = self._dataset[index]["label"].numpy()
+        image = self._dataset[index]["image"]
+        seg = self._dataset[index]["label"]
+
+        # Remove tumor mask
+        seg[seg == 2] = 0
 
         # Transpose to dims (z, x, y)
-        image = image.transpose(2, 1, 0)
-        seg = seg.transpose(2, 1, 0)
+        image = image.permute(2, 1, 0)
+        seg = seg.permute(2, 1, 0)
 
-        non_zero_slices = np.any(seg, axis=(1, 2))  # Slices where segmented organ is present
+        non_zero_slices = torch.any(seg, dim=(1, 2))  # Slices where segmented organ is present
 
         # Only keep slices where segmented organ is present
         image = image[non_zero_slices]
         seg = seg[non_zero_slices]
-
-        # Convert to tensor
-        image = torch.tensor(image, dtype=torch.float32)
-        seg = torch.tensor(seg, dtype=torch.float32)
 
         return DataExample(x=image, y=seg)
 
@@ -116,7 +133,7 @@ class SlicedDecathlonDataset(Dataset):
             apply_augmentations: bool
     ):
         """
-        Creates the dataset from a ....
+        Creates the dataset from a Subset of DecathlonDataset.
 
         Parameters
         ----------
@@ -148,7 +165,8 @@ class SlicedDecathlonDataset(Dataset):
                 scale_range=[0.2, 0.2],         # Sample scaling factor from U(0.8, 1.2) in both dims
                 mode="nearest",                 # Like for torchvision's RandAffine
                 padding_mode="zeros"            # Like for torchvision's RandAffine
-            )
+            ),
+            ToTensord(keys=["img", "seg"], track_meta=False),   # Otherwise MONAI transforms return monai.MetaTensor
         ])
 
     def _get_slice_indices_mapping(self) -> List[Tuple[int, int]]:
@@ -196,7 +214,7 @@ class SlicedDecathlonDataset(Dataset):
         # Get the patient and slice indices
         patient_idx, slice_idx = self._slice_indices_mapping[index]
 
-        # Get patient
+        # Get patient tensor
         patient = self._dataset[patient_idx]
 
         # Get slice and add channel dimension
