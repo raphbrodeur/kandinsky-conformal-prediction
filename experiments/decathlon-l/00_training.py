@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     # Slices dataset
     train_ds = SlicedDecathlonDataset(dataset=train_ds, size=[384, 384], apply_augmentations=True)
-    print("num slices in train_ds", len(train_ds))
+
     train_loader = DataLoader(
         dataset=train_ds,
         batch_size=batch_size,
