@@ -123,7 +123,6 @@ class COCODataset(Dataset):
         seg_mask = np.zeros((h, w, 1))  # Segmentation mask with same size as image
         for ann in annotations:
 
-            # TODO workaround to skip empty annotations. Warning: might reduce a dataset's actual size
             if len(ann["segmentation"]) == 0:
                 print("Skipping item, no segmentation found.")
                 continue
