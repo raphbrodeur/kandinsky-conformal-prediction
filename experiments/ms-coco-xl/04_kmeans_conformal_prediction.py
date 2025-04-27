@@ -1,16 +1,18 @@
 """
-    @file:              03_pixelwise_conformal_prediction.py
+    @file:              04_kmeans_conformal_prediction.py
     @Author:            Raphael Brodeur
 
     @Creation Date:     04/2025
     @Last modification: 04/2025
 
-    @Description:       This file contains the script to perform pixel-wise conformal prediction for the MS-COCO-XL
-                        experiment from the paper.
+    @Description:       This file contains the script to perform k-means kandinsky conformal prediction for the
+                        MS-COCO-XL experiment from the paper.
 """
 
 import matplotlib.pyplot as plt
 from monai.utils import set_determinism
+import numpy as np
+from sklearn.cluster import KMeans
 import torch
 from torch.utils.data import DataLoader, random_split
 
@@ -25,6 +27,7 @@ if __name__ == "__main__":
     num_training_samples = 678
     num_calibration_samples = 20000
     num_testing_samples = 2869
+    num_clusters = 4                # k = 4 in code from paper
 
     # Set device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -74,20 +77,64 @@ if __name__ == "__main__":
     # Load model weights
     net.load_state_dict(torch.load("./saved_params/model_params.pt", map_location=device))
 
-    # Load calibration non-conformity_scores
+    # Load calibration non_conformity_scores
     calib_non_conformity_scores = torch.load("./saved_non_conformity_scores/non_conformity_scores.pt")
 
-    # Get pixel-wise non-conformity curves. Has shape (101, 1, 240, 320).
+    # Get pixel-wise non-conformity curves for clustering
     non_conformity_curves = torch.quantile(
         calib_non_conformity_scores,
         torch.linspace(0, 1, 101),          # For each pixel, get a curve of q_hat for 1-alpha=0.0,...,1.0
         dim=0,                              # Pixel-wise
         interpolation="higher"              # Corresponds to ceil((n+1)(1-a)) / n quantile
     )
+    # print(non_conformity_curves.shape)    # torch.Size([101, 1, 240, 320])
+
+    # Cluster pixels based on similarity of their non-conformity curves (k-means clustering)
+    kmeans_cluster_finder = KMeans(
+        n_clusters=num_clusters,
+        random_state=0
+    )
+
+    # Approximate non-conformity curves are used in the paper's code to determine the clusters but no mention in paper.
+    ...
+
+    # Get mask of cluster labels for each pixel
+    kandinsky_mask = kmeans_cluster_finder.fit_predict(
+        non_conformity_curves[:, 0, :, :].reshape(-1, non_conformity_curves.shape[0]).cpu().numpy()
+    )
+
+    # Reshape kandinsky mask to original 2d image shape (row-major so should be same positions as in original image)
+    kandinsky_mask = kandinsky_mask.reshape(
+        non_conformity_curves.shape[2], non_conformity_curves.shape[3]
+    )
+
+    # Plot Kandinsky mask
+    plt.imshow(kandinsky_mask)
+    plt.show()
+
+    # Get a non-conformity curve for each cluster
+    for cluster_label in range(num_clusters):
+        # Aggregate all non-conformity scores of every pixel in the calibration set belonging to the cluster
+        cluster_non_conformity_scores = calib_non_conformity_scores[:, 0, kandinsky_mask == cluster_label].flatten().numpy()
+
+        # Get a non-conformity curve for the cluster
+        cluster_non_conformity_curve = np.quantile(
+            cluster_non_conformity_scores,
+            np.linspace(0, 1, 101), # For each pixel, get a curve of q_hat for 1-alpha=0.0,...,1.0
+            method="higher"         # Corresponds to ceil((n+1)(1-a)) / n quantile
+        )
+
+        # Create tensor with cluster curve at every position and reshape to shape (101, H, W)
+        cluster_non_conformity_curve = torch.from_numpy(
+            cluster_non_conformity_curve
+        ).unsqueeze(-1).unsqueeze(-1).expand(101, *calib_non_conformity_scores.shape[2:])
+
+        # Update non-conformity curves of pixels belonging to cluster
+        non_conformity_curves[:, 0, kandinsky_mask == cluster_label] = cluster_non_conformity_curve[:, kandinsky_mask == cluster_label]
 
     # Save non-conformity curves
-    # torch.save(non_conformity_curves, "./saved_non_conformity_curves/pixelwise_non_conformity_curves.pt")
-    # print("Saved pixel-wise non-conformity curves.")
+    # torch.save(non_conformity_curves, "./saved_non_conformity_curves/kmeans_non_conformity_curves.pt")
+    # print("Saved k-means non-conformity curves.")
 
 
     # Examples
