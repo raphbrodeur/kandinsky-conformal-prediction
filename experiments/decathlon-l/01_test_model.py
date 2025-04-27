@@ -95,8 +95,11 @@ if __name__ == "__main__":
             y_pred = net(x)                     # Model forward pass
             y_pred = torch.sigmoid(y_pred)      # Sigmoid
 
+            # Classification threshold
+            y_pred = torch.round(y_pred)        # Rounding the model prediction
+
             # Get Dice score
-            dice_score = dice_metric(y=y, y_pred=torch.round(y_pred))     # Rounding the model prediction
+            dice_score = dice_metric(y=y, y_pred=y_pred)     # Rounding the model prediction
 
             dice_score_list.append(dice_score.item())
 
