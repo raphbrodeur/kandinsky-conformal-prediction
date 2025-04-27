@@ -84,5 +84,5 @@ if __name__ == "__main__":
         calib_non_conformity_scores = torch.cat(non_conformity_score_list, dim=0)
 
         # Save calibration non-conformity scores
-        torch.save(calib_non_conformity_scores, "./saved_non_conformity_scores/non_conformity_scores.pt")
-        print("Saved calibration set non-conformity scores.")
+        # torch.save(calib_non_conformity_scores, "./saved_non_conformity_scores/non_conformity_scores.pt")
+        # print("Saved calibration set non-conformity scores.")

@@ -11,7 +11,6 @@
 
 import matplotlib.pyplot as plt
 from monai.utils import set_determinism
-import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split
 
