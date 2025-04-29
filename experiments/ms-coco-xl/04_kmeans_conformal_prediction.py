@@ -87,7 +87,6 @@ if __name__ == "__main__":
         dim=0,                              # Pixel-wise
         interpolation="higher"              # Corresponds to ceil((n+1)(1-a)) / n quantile
     )
-    # print(non_conformity_curves.shape)    # torch.Size([101, 1, 240, 320])
 
     # Cluster pixels based on similarity of their non-conformity curves (k-means clustering)
     kmeans_cluster_finder = KMeans(
@@ -98,18 +97,18 @@ if __name__ == "__main__":
     # Approximate non-conformity curves are used in the paper's code to determine the clusters but no mention in paper.
     ...
 
-    # Get mask of cluster labels for each pixel
+    # Get mask of cluster labels for each pixel. NOTE: need .permute() so .reshape() (row-major order) works properly !
     kandinsky_mask = kmeans_cluster_finder.fit_predict(
-        non_conformity_curves[:, 0, :, :].reshape(-1, non_conformity_curves.shape[0]).cpu().numpy()
+        non_conformity_curves.permute(1, 2, 3, 0)[0].reshape(-1, non_conformity_curves.shape[0]).cpu().numpy()
     )
 
-    # Reshape kandinsky mask to original 2d image shape (row-major so should be same positions as in original image)
-    kandinsky_mask = kandinsky_mask.reshape(
-        non_conformity_curves.shape[2], non_conformity_curves.shape[3]
-    )
+    # Reshape kandinsky mask to original 2d image shape
+    kandinsky_mask = kandinsky_mask.reshape(non_conformity_curves.shape[2], non_conformity_curves.shape[3])
 
-    # Plot Kandinsky mask
-    plt.imshow(kandinsky_mask)
+    # Plot the kandinsky mask
+    plt.imshow(kandinsky_mask, aspect='auto', origin='upper')
+    plt.colorbar()  # Add a colorbar to visualize cluster labels
+    plt.title("Kandinsky Mask MS-COCO-XL (K-Means)")
     plt.show()
 
     # Get a non-conformity curve for each cluster
@@ -140,7 +139,7 @@ if __name__ == "__main__":
     # Examples
 
     # Get q_hat
-    alpha = 0.2     # If alpha=0.1 then we want prob bound of 0.9; then we want quantile 0.9
+    alpha = 0.25     # If alpha=0.1 then we want prob bound of 0.9; then we want quantile 0.9
     q_hat = non_conformity_curves[int((1 - alpha) * 100)].to(device)
 
     net.eval()

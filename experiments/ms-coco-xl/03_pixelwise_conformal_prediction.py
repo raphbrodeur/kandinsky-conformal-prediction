@@ -93,7 +93,7 @@ if __name__ == "__main__":
     # Examples
 
     # Get q_hat
-    alpha = 0.2     # If alpha=0.1 then we want prob bound of 0.9; then we want quantile 0.9
+    alpha = 0.25     # If alpha=0.1 then we want prob bound of 0.9; then we want quantile 0.9
     q_hat = non_conformity_curves[int((1 - alpha) * 100)].to(device)
 
     net.eval()
@@ -108,10 +108,13 @@ if __name__ == "__main__":
             y_pred = torch.sigmoid(y_pred)
 
             # Get conformal prediction set for class "segmentation"
+            # NOTE: this set contains all pixels for which class_label=1 is in the prediction set
+            # (but class_label=0 may also be in there)
             y_pred_conformal = torch.where(y_pred >= (1 - q_hat), 1., 0.)   # 1 if pixel is in pred set, 0 otherwise
 
             # Post-processing
             y_pred = torch.round(y_pred)    # Rounding as a classification threshold
+
 
             # Compare ground truth, prediction and conformal prediction
             image = x[0][0].cpu().numpy()
