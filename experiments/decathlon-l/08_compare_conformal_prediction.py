@@ -21,6 +21,7 @@ from torch.utils.data import DataLoader, random_split
 from src.data import DecathlonDataset, SlicedDecathlonDataset
 from src.models import UNetPaper
 
+
 if __name__ == "__main__":
     # Set random seed
     set_determinism(seed=1010710)
