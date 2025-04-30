@@ -1,17 +1,16 @@
 """
-    @file:              07_imagewise_conformal_prediction.py
+    @file:              03_pixelwise_conformal_prediction.py
     @Author:            Raphael Brodeur
 
     @Creation Date:     04/2025
     @Last modification: 04/2025
 
-    @Description:       This file contains the script to perform image-wise conformal prediction for the MS-COCO-XL
+    @Description:       This file contains the script to perform pixel-wise conformal prediction for the MS-COCO-S
                         experiment from the paper.
 """
 
 import matplotlib.pyplot as plt
 from monai.utils import set_determinism
-import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split
 
@@ -73,30 +72,25 @@ if __name__ == "__main__":
     ).to(device)
 
     # Load model weights
-    net.load_state_dict(torch.load("./saved_params/model_params.pt", map_location=device))
+    net.load_state_dict(torch.load("../ms-coco-xl/saved_params/model_params.pt", map_location=device))
 
     # Load calibration non-conformity_scores
-    calib_non_conformity_scores = torch.load("./saved_non_conformity_scores/non_conformity_scores.pt")
+    calib_non_conformity_scores = torch.load("../ms-coco-xl/saved_non_conformity_scores/non_conformity_scores.pt")
 
-    # Get image-wise non-conformity curves
-    # Flatten H & W dims before computing the quantiles. Has shape (num_calib_samples, num_channels, H*W)
-    calib_flatten_non_conformity_scores = torch.flatten(calib_non_conformity_scores, start_dim=2).cpu().numpy()
+    # Use only 100 calibration samples
+    calib_non_conformity_scores = calib_non_conformity_scores[:100]
 
-    # Get curve for all aggregated pixels in calibration set (aggregated from all images)
-    non_conformity_curve = np.quantile(
-        calib_flatten_non_conformity_scores,
-        np.linspace(0, 1, 101),
-        method="higher"              # Corresponds to ceil((n+1)(1-a)) / n quantile
+    # Get pixel-wise non-conformity curves. Has shape (101, 1, 240, 320).
+    non_conformity_curves = torch.quantile(
+        calib_non_conformity_scores,
+        torch.linspace(0, 1, 101),          # For each pixel, get a curve of q_hat for 1-alpha=0.0,...,1.0
+        dim=0,                              # Pixel-wise
+        interpolation="higher"              # Corresponds to ceil((n+1)(1-a)) / n quantile
     )
 
-    non_conformity_curve = torch.from_numpy(non_conformity_curve).unsqueeze(-1).unsqueeze(-1)
-
-    # Put back in image shape
-    non_conformity_curves = non_conformity_curve.expand(101, *calib_non_conformity_scores.shape[2:]).unsqueeze(1)
-
     # Save non-conformity curves
-    torch.save(non_conformity_curves, "./saved_non_conformity_curves/imagewise_non_conformity_curves.pt")
-    print("Saved image-wise non-conformity curves.")
+    # torch.save(non_conformity_curves, "./saved_non_conformity_curves/pixelwise_non_conformity_curves.pt")
+    # print("Saved pixel-wise non-conformity curves.")
 
 
     # Examples

@@ -5,7 +5,7 @@
     @Creation Date:     04/2025
     @Last modification: 04/2025
 
-    @Description:       This file contains the script to compare conformal prediction methods for the MS-COCO-XL
+    @Description:       This file contains the script to perform image-wise conformal prediction for the MS-COCO-S
                         experiment from the paper.
 """
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     ).to(device)
 
     # Load model weights
-    net.load_state_dict(torch.load("./saved_params/model_params.pt", map_location=device))
+    net.load_state_dict(torch.load("../ms-coco-xl/saved_params/model_params.pt", map_location=device))
 
     # Load non-conformity curves
     pixelwise_nc_curves = torch.load("./saved_non_conformity_curves/pixelwise_non_conformity_curves.pt", map_location=device)

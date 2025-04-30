@@ -16,15 +16,6 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split
 
-from src.data import COCODataset
-from src.models import UNetPaper
-
-from monai.losses import DiceLoss
-from monai.utils import set_determinism
-import numpy as np
-import torch
-from torch.utils.data import DataLoader, random_split
-
 from src.data import DecathlonDataset, SlicedDecathlonDataset
 from src.models import UNetPaper
 
@@ -45,7 +36,7 @@ if __name__ == "__main__":
     ds = DecathlonDataset(path_to_dir="C:/Users/Labo/Desktop/datasets/decathlon/Task07_Pancreas")
 
     # Split dataset into training and calibration sets (no offset in random from training.py so same split)
-    train_ds, calib_ds, left_over_data = random_split(
+    train_ds, calib_ds, test_ds = random_split(
         dataset=ds,
         lengths=[
             num_training_samples,                                       # 86
@@ -56,7 +47,7 @@ if __name__ == "__main__":
 
     # Slices dataset
     test_ds = SlicedDecathlonDataset(
-        dataset=train_ds,
+        dataset=test_ds,
         size=[384, 384],
         apply_augmentations=False
     )

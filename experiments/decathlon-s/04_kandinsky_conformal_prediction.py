@@ -6,7 +6,7 @@
     @Last modification: 04/2025
 
     @Description:       This file contains the script to perform k-means kandinsky conformal prediction for the
-                        MS-COCO-XL experiment from the paper.
+                        Decathlon-L experiment from the paper.
 """
 
 import matplotlib.pyplot as plt
@@ -16,7 +16,7 @@ from sklearn.cluster import KMeans
 import torch
 from torch.utils.data import DataLoader, random_split
 
-from src.data import COCODataset
+from src.data import DecathlonDataset, SlicedDecathlonDataset
 from src.models import UNetPaper
 
 if __name__ == "__main__":
@@ -24,9 +24,8 @@ if __name__ == "__main__":
     set_determinism(seed=1010710)
 
     # Hyperparameters
-    num_training_samples = 678
-    num_calibration_samples = 20000
-    num_testing_samples = 2869
+    num_training_samples = 86
+    num_calibration_samples = 77
     num_clusters = 4                # k = 4 in code from paper
 
     # Set device
@@ -34,29 +33,23 @@ if __name__ == "__main__":
     num_workers = 0
 
     # Dataset
-    ds = COCODataset(
-        path_to_dir="C:/Users/Labo/Desktop/datasets/coco_2017_seg/learning",
-        size=[320, 240],
-        apply_augmentations=False
-    )
+    ds = DecathlonDataset(path_to_dir="C:/Users/Labo/Desktop/datasets/decathlon/Task07_Pancreas")
 
-    # Split dataset into training and calibration sets
+    # Split dataset into training and calibration sets (no offset in random from training.py so same split)
     train_ds, calib_ds, left_over_data = random_split(
         dataset=ds,
         lengths=[
-            num_training_samples,                                       # 678
-            num_calibration_samples,                                    # 20000
-            len(ds) - num_training_samples - num_calibration_samples    # 43437
+            num_training_samples,                                       # 86
+            num_calibration_samples,                                    # 77
+            len(ds) - num_training_samples - num_calibration_samples    # 118
         ]
     )
 
-    # Take 2869 test samples from left_over_data
-    test_ds, _ = random_split(
-        dataset=left_over_data,
-        lengths=[
-            num_testing_samples,
-            len(left_over_data) - num_testing_samples,
-        ]
+    # Slices dataset
+    test_ds = SlicedDecathlonDataset(
+        dataset=train_ds,
+        size=[384, 384],
+        apply_augmentations=False
     )
 
     test_loader = DataLoader(
@@ -69,16 +62,19 @@ if __name__ == "__main__":
 
     # Model
     net = UNetPaper(
-        in_channels=3,
+        in_channels=1,
         out_channels=1,
         channels=128
     ).to(device)
 
     # Load model weights
-    net.load_state_dict(torch.load("./saved_params/model_params.pt", map_location=device))
+    net.load_state_dict(torch.load("../decathlon-l/saved_params/model_params.pt", map_location=device))
 
-    # Load calibration non_conformity_scores
-    calib_non_conformity_scores = torch.load("./saved_non_conformity_scores/non_conformity_scores.pt")
+    # Load calibration non-conformity_scores
+    calib_non_conformity_scores = torch.load("../decathlon-l/saved_non_conformity_scores/non_conformity_scores.pt")
+
+    # Use only 27 calibration samples
+    calib_non_conformity_scores = calib_non_conformity_scores[:27]
 
     # Get pixel-wise non-conformity curves for clustering
     non_conformity_curves = torch.quantile(
@@ -108,7 +104,7 @@ if __name__ == "__main__":
     # Plot the kandinsky mask
     plt.imshow(kandinsky_mask, aspect='auto', origin='upper')
     plt.colorbar()  # Add a colorbar to visualize cluster labels
-    plt.title("Kandinsky Mask MS-COCO-XL (K-Means)")
+    plt.title("Kandinsky Mask Decathlon-L (K-Means)")
     plt.show()
 
     # Get a non-conformity curve for each cluster
@@ -153,7 +149,7 @@ if __name__ == "__main__":
             y_pred = net(x)
             y_pred = torch.sigmoid(y_pred)
 
-            # Get conformal prediction set for class "segmentation"
+            # Get pixels for class label "segmentation" are in the prediction set
             y_pred_conformal = torch.where(y_pred >= (1 - q_hat), 1., 0.)   # 1 if pixel is in pred set, 0 otherwise
 
             # Post-processing
