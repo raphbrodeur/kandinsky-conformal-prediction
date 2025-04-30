@@ -1,0 +1,10 @@
+monai~=1.4.0
+nibabel
+pillow~=11.0.0
+pycocotools~=2.0.8
+torch~=2.6.0+cu118
+numpy~=1.26.4
+torchvision~=0.21.0+cu118
+matplotlib~=3.10.1
+seaborn
+scikit-learn~=1.6.1
